@@ -1,0 +1,71 @@
+================
+HOST ENVIRONMENT
+================
+Processor	=> i7-6700
+Motherboard	=> Dell OptiPlex 7040
+BIOS Version	=> 1.7.1 (Before Meltdown and Spectre Patches)
+TSX		=> Available
+SGX		=> Enabled
+Speed Step	=> Disabled
+C-State		=> Disabled
+Host OS		=> 18.04.5 LTS
+
+=========
+SGX Setup
+=========
+SGX SDK		=> https://github.com/intel/linux-sgx/tree/sgx_2.7.1
+SGX Driver	=> https://github.com/intel/linux-sgx-driver/tree/sgx_driver_2.6
+SGX Step	=> https://github.com/jovanbulck/sgx-step/tree/v1.4.0
+
+=====================================
+Step-1: Install SGX SDK Dependencies:
+=====================================
+$ sudo apt-get install build-essential ocaml ocamlbuild automake autoconf libtool wget python libssl-dev libssl-dev libcurl4-openssl-dev protobuf-compiler libprotobuf-dev debhelper cmake build-essential python libssl-dev libcurl4-openssl-dev libprotobuf-dev 
+
+==================
+Step-2: SGX Driver
+==================
+$ sudo -i
+$ mkdir /opt/intel
+$ cd /opt/intel
+$ git clone https://github.com/intel/linux-sgx-driver.git
+$ git checkout sgx_driver_2.6
+$ make
+$ mkdir -p "/lib/modules/"`uname -r`"/kernel/drivers/intel/sgx"
+$ cp isgx.ko "/lib/modules/"`uname -r`"/kernel/drivers/intel/sgx"
+$ sh -c "cat /etc/modules | grep -Fxq isgx || echo isgx >> /etc/modules"
+$ /sbin/depmod
+$ /sbin/modprobe isgx
+$ reboot
+
+========================
+Step-3: Install SGX-Step
+========================
+$ sudo -i
+$ cd /opt/intel
+$ git clone https://github.com/jovanbulck/sgx-step.git
+$ git checkout v1.4.0
+$ git submodule init
+$ git submodule update
+$ ./install_SGX_driver.sh
+$ ./install_SGX_SDK.sh
+
+==============================
+Step-4: Update Grub Parameters
+==============================
+$ sudo vim /etc/default/grub
+  # GRUB_CMDLINE_LINUX_DEFAULT="quiet splash nox2apic iomem=relaxed no_timer_check nosmep nosmap isolcpus=1 dis_ucode_ldr"
+$ sudo update-grub && sudo reboot
+
+===========================
+Step-5: Run Foreshadow Demo
+===========================
+$ sudo -i
+$ cd /opt/intel
+$ source sgxsdk/environment
+$ cd sgx-step/kernel
+$ make clean load
+$ cd ../app/foreshadow
+$ make
+$ ./app
+

@@ -1,0 +1,70 @@
+================
+HOST ENVIRONMENT
+================
+Processor	=> i7-6700
+Motherboard	=> Dell OptiPlex 7040
+BIOS Version	=> 1.7.1 (Before Meltdown and Spectre Patches)
+TSX		=> Available
+SGX		=> Enabled
+Speed Step	=> Disabled
+C-State		=> Disabled
+Host OS		=> 18.04.5 LTS
+VTx		=> Enabled
+Pre-Req Script	=> pre_req_hyp.sh (Reference: https://gist.github.com/cnlelema/5f14675364a47c6ffa7e34bb6d3ad470)
+
+====================
+compile from sources
+====================
+$ cd mkinitrd (Reference: https://github.com/openSUSE/mkinitrd.git)
+$ sudo cp sbin/installkernel /sbin/installkernel
+$ git clone git://xenbits.xen.org/xen.git
+$ git checkout origin/stable-4.9
+$ sudo make distclean -j8
+$ sudo ./configure --libdir=/usr/local --enable-systemd
+$ sudo make dist-xen -j8
+$ sudo make install-xen -j8
+$ sudo /sbin/ldconfig
+$ sudo gedit /etc/default/grub
+	# update timeout to -1 to be able and timeout style to menu to be able to see xen in GRUB
+$ sudo update-grub
+$ sudo reboot
+$ sudo apt install xen-tools
+	# By default Ubuntu 18.04.5 will install 4.9 xen tools
+$ sudo reboot
+
+============
+Setup Xenbr0
+============
+$ sudo nmcli con add ifname xenbr0 type bridge con-name xenbr0
+$ sudo nmcli con add type bridge-slave ifname enp0s31f6 master xenbr0
+	# Replace enp0s31f6 with interface name 
+$ nmcli connection show
+	# Note NAME for enp0s31f6 interface
+$ sudo nmcli con modify br0 bridge.stp no
+$ sudo nmcli con down "Wired connection 1"
+	# Replace "Wired connection 1" with the name got in above command
+$ sudo nmcli con up xenbr0
+	# Bridge should be setup now
+$ sudo systemctl restart network-manager
+$ sudo reboot
+# Reference: https://www.cyberciti.biz/faq/how-to-add-network-bridge-with-nmcli-networkmanager-on-linux/
+
+=====================
+PV-Guest Installation
+=====================
+$ pvcreate /dev/sdb2
+	# Assuming SDB2 is already reserved for PV Guest
+$ sudo vgcreate vg0 /dev/sda3
+$ sudo gedit /etc/xen-tools/xen-tools.conf
+	# Search for size and update hdd size for PV Guest
+$ sudo xen-create-image --hostname=xenial   --memory=2048mb   --vcpus=2   --lvm=vg0   --dhcp   --pygrub   --dist=xenial
+	# For PV Guest, only xenial works fine
+
+
+======================
+HVM Guest Installation
+======================
+=> Install Bionic Ubuntu minimal ISO from this link (https://help.ubuntu.com/community/Installation/MinimalCD)
+	# For HVM Guest, only bionic works fine
+=> Search for section "Manually installing an HVM Guest VM" from this link (https://help.ubuntu.com/community/Xen)
+=> Install HVM Guest, VNC Viewer should be connected through local host
